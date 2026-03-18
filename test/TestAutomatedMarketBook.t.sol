@@ -106,4 +106,28 @@ contract TestAutomatedMarketBook is Test {
         console.log("Contract Token 1 Balance: ", token1.balanceOf(address(automatedMarketBook)));
         console.log("Contract Token 2 Balance: ", token2.balanceOf(address(automatedMarketBook)));
     }
+
+    function test__AutomatedOrderMatching() public {
+        vm.prank(contractOwner);
+        automatedMarketBook.createNewCommodity(address(token1));
+
+        vm.startPrank(user2);
+        token2.approve(address(automatedMarketBook), 3 ether);
+        automatedMarketBook.setupBuyOrder(address(token1), 1 ether, 3, address(token2));
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        token1.approve(address(automatedMarketBook), 1 ether);
+        automatedMarketBook.setupSellOrderAndMatch(address(token1), 1 ether, 1, address(token2));
+        vm.stopPrank();
+
+        console.log("User 1 Token 1 Balance: ", token1.balanceOf(user1));
+        console.log("User 1 Token 2 Balance: ", token2.balanceOf(user1));
+
+        console.log("User 2 Token 1 Balance: ", token1.balanceOf(user2));
+        console.log("User 2 Token 2 Balance: ", token2.balanceOf(user2));
+
+        console.log("Contract Token 1 Balance: ", token1.balanceOf(address(automatedMarketBook)));
+        console.log("Contract Token 2 Balance: ", token2.balanceOf(address(automatedMarketBook)));
+    }
 }
