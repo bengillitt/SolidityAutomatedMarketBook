@@ -23,7 +23,7 @@ contract AutomatedMarketBook {
         address account;
         uint256 amount;
         uint256 price;
-        address buyingCommodity;
+        address purchasingCommodity;
         bool fulfilled;
         OrderType orderType;
     }
@@ -53,7 +53,7 @@ contract AutomatedMarketBook {
         commodities.push(_commodity);
     }
 
-    function setupBuyOrder(address _commodity, uint256 _amount, uint256 _price, address _buyingCommodity)
+    function setupBuyOrder(address _commodity, uint256 _amount, uint256 _price, address _purchasingCommodity)
         public
         payable
         returns (Order memory order)
@@ -61,13 +61,13 @@ contract AutomatedMarketBook {
         require(_amount > 0, AutomatedMarketBook__AmountMustBeGreaterThanZero());
         require(_price > 0, AutomatedMarketBook__PriceMustBeGreaterThanZero());
 
-        if (_buyingCommodity == address(0)) {
+        if (_purchasingCommodity == address(0)) {
             require(msg.value >= _amount * _price, AutomatedMarketBook__OwnerDoesNotHaveFunds());
         } else {
-            uint256 allowance = IERC20(_buyingCommodity).allowance(msg.sender, address(this));
+            uint256 allowance = IERC20(_purchasingCommodity).allowance(msg.sender, address(this));
             require(allowance >= _amount * _price, AutomatedMarketBook__OwnerDoesNotHaveFunds());
 
-            bool txStatus = IERC20(_buyingCommodity).transferFrom(msg.sender, address(this), _amount * _price);
+            bool txStatus = IERC20(_purchasingCommodity).transferFrom(msg.sender, address(this), _amount * _price);
             require(txStatus, AutomatedMarketBook__TransactionFailed());
         }
 
@@ -76,7 +76,7 @@ contract AutomatedMarketBook {
             account: msg.sender,
             amount: _amount,
             price: _price,
-            buyingCommodity: _buyingCommodity,
+            purchasingCommodity: _purchasingCommodity,
             fulfilled: false,
             orderType: OrderType.BUY
         });
@@ -84,16 +84,16 @@ contract AutomatedMarketBook {
         buyOrders[_commodity].push(order);
     }
 
-    function setupBuyOrderAndMatch(address _commodity, uint256 _amount, uint256 _price, address _buyingCommodity)
+    function setupBuyOrderAndMatch(address _commodity, uint256 _amount, uint256 _price, address _purchasingCommodity)
         public
         payable
         returns (Order memory order)
     {
-        order = setupBuyOrder(_commodity, _amount, _price, _buyingCommodity);
+        order = setupBuyOrder(_commodity, _amount, _price, _purchasingCommodity);
         matchBuyOrder(order);
     }
 
-    function setupSellOrder(address _commodity, uint256 _amount, uint256 _price, address _buyingCommodity)
+    function setupSellOrder(address _commodity, uint256 _amount, uint256 _price, address _purchasingCommodity)
         public
         payable
         returns (Order memory order)
@@ -116,7 +116,7 @@ contract AutomatedMarketBook {
             account: msg.sender,
             amount: _amount,
             price: _price,
-            buyingCommodity: _buyingCommodity,
+            purchasingCommodity: _purchasingCommodity,
             fulfilled: false,
             orderType: OrderType.SELL
         });
@@ -124,14 +124,20 @@ contract AutomatedMarketBook {
         sellOrders[_commodity].push(order);
     }
 
-    function setupSellOrderAndMatch(address _commodity, uint256 _amount, uint256 _price, address _buyingCommodity)
+    function setupSellOrderAndMatch(address _commodity, uint256 _amount, uint256 _price, address _purchasingCommodity)
         public
         payable
         returns (Order memory order)
     {
-        order = setupSellOrder(_commodity, _amount, _price, _buyingCommodity);
+        order = setupSellOrder(_commodity, _amount, _price, _purchasingCommodity);
         matchSellOrder(order);
     }
+
+    function setupSellOrderAtSpot(address _commodity, uint256 _amount, address _purchasingCommodity)
+        public
+        payable
+        returns (Order memory order)
+    {}
 
     function orderMatching(Order memory _order) internal {
         if (_order.orderType == OrderType.BUY) {
@@ -154,7 +160,7 @@ contract AutomatedMarketBook {
 
             if (
                 currentBuyOrder.account == _order.account && currentBuyOrder.price == _order.price
-                    && currentBuyOrder.buyingCommodity == _order.buyingCommodity
+                    && currentBuyOrder.purchasingCommodity == _order.purchasingCommodity
                     && currentBuyOrder.orderType == _order.orderType && currentBuyOrder.fulfilled == _order.fulfilled
             ) {
                 buyOrderIndex = i;
@@ -197,18 +203,18 @@ contract AutomatedMarketBook {
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     }
 
-                    if (_order.buyingCommodity == address(0)) {
+                    if (_order.purchasingCommodity == address(0)) {
                         (bool txStatus,) = (sellOrder.account).call{value: sellOrder.price * _order.amount}("");
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
 
                         (txStatus,) = (_order.account).call{value: (_order.price - sellOrder.price) * _order.amount}("");
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     } else {
-                        bool txStatus =
-                            IERC20(_order.buyingCommodity).transfer(sellOrder.account, sellOrder.price * _order.amount);
+                        bool txStatus = IERC20(_order.purchasingCommodity)
+                            .transfer(sellOrder.account, sellOrder.price * _order.amount);
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
 
-                        txStatus = IERC20(_order.buyingCommodity)
+                        txStatus = IERC20(_order.purchasingCommodity)
                             .transfer(_order.account, (_order.price - sellOrder.price) * _order.amount);
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     }
@@ -235,7 +241,7 @@ contract AutomatedMarketBook {
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     }
 
-                    if (_order.buyingCommodity == address(0)) {
+                    if (_order.purchasingCommodity == address(0)) {
                         (bool txStatus,) = (sellOrder.account).call{value: sellOrder.amount * sellOrder.price}("");
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
 
@@ -243,12 +249,12 @@ contract AutomatedMarketBook {
                             (_order.account).call{value: (_order.price - sellOrder.price) * sellOrder.amount}("");
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     } else {
-                        bool txStatus = IERC20(_order.buyingCommodity)
+                        bool txStatus = IERC20(_order.purchasingCommodity)
                             .transfer(sellOrder.account, sellOrder.amount * sellOrder.price);
 
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
 
-                        txStatus = IERC20(_order.buyingCommodity)
+                        txStatus = IERC20(_order.purchasingCommodity)
                             .transfer(_order.account, (_order.price - sellOrder.price) * sellOrder.amount);
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     }
@@ -282,7 +288,7 @@ contract AutomatedMarketBook {
 
             if (
                 currentSellOrder.account == _order.account && currentSellOrder.price == _order.price
-                    && currentSellOrder.buyingCommodity == _order.buyingCommodity
+                    && currentSellOrder.purchasingCommodity == _order.purchasingCommodity
                     && currentSellOrder.orderType == _order.orderType && currentSellOrder.fulfilled == _order.fulfilled
             ) {
                 sellOrderIndex = i;
@@ -325,12 +331,12 @@ contract AutomatedMarketBook {
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     }
 
-                    if (_order.buyingCommodity == address(0)) {
+                    if (_order.purchasingCommodity == address(0)) {
                         (bool txStatus,) = (_order.account).call{value: buyOrder.price * _order.amount}("");
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     } else {
                         bool txStatus =
-                            IERC20(_order.buyingCommodity).transfer(_order.account, buyOrder.price * _order.amount);
+                            IERC20(_order.purchasingCommodity).transfer(_order.account, buyOrder.price * _order.amount);
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     }
 
@@ -356,12 +362,12 @@ contract AutomatedMarketBook {
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     }
 
-                    if (_order.buyingCommodity == address(0)) {
+                    if (_order.purchasingCommodity == address(0)) {
                         (bool txStatus,) = (_order.account).call{value: buyOrder.amount * buyOrder.price}("");
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     } else {
-                        bool txStatus =
-                            IERC20(_order.buyingCommodity).transfer(_order.account, buyOrder.amount * buyOrder.price);
+                        bool txStatus = IERC20(_order.purchasingCommodity)
+                            .transfer(_order.account, buyOrder.amount * buyOrder.price);
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     }
 
