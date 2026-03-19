@@ -176,21 +176,11 @@ contract AutomatedMarketBook {
 
         while (_order.amount > 0 && !complete) {
             complete = true;
-            uint256 currentMin = 0;
-            uint256 minIndex = 0;
 
-            for (uint256 i = 0; i < sellOrders[_order.commodity].length; i++) {
-                if (!sellOrders[_order.commodity][i].fulfilled) {
-                    if (currentMin > sellOrders[_order.commodity][i].price) {
-                        currentMin = sellOrders[_order.commodity][i].price;
-                        minIndex = i;
-                    }
-                }
-            }
+            (Order memory sellOrder, uint256 minIndex, bool success) =
+                getMinSellOrder(_order.commodity, _order.purchasingCommodity);
 
-            Order memory sellOrder = sellOrders[_order.commodity][minIndex];
-
-            if (currentMin <= _order.price) {
+            if (sellOrder.price <= _order.price && success) {
                 complete = false;
                 if (sellOrder.amount >= _order.amount) {
                     sellOrder.amount = sellOrder.amount - _order.amount;
@@ -229,10 +219,6 @@ contract AutomatedMarketBook {
                 } else {
                     _order.amount = _order.amount - sellOrder.amount;
 
-                    sellOrder.amount = 0;
-
-                    sellOrder.fulfilled = true;
-
                     if (_order.commodity == address(0)) {
                         (bool txStatus,) = (_order.account).call{value: sellOrder.amount}("");
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
@@ -259,11 +245,15 @@ contract AutomatedMarketBook {
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     }
 
+                    sellOrder.amount = 0;
+
+                    sellOrder.fulfilled = true;
+
                     sellOrders[_order.commodity][minIndex] = sellOrder;
                 }
 
-                if (_order.amount >= 0) {
-                    complete = false;
+                if (_order.amount == 0) {
+                    complete = true;
                 }
             }
         }
@@ -304,21 +294,10 @@ contract AutomatedMarketBook {
 
         while (_order.amount > 0 && !complete) {
             complete = true;
-            uint256 currentMax = 0;
-            uint256 minIndex = 0;
+            (Order memory buyOrder, uint256 maxIndex, bool success) =
+                getMaxBuyOrder(_order.commodity, _order.purchasingCommodity);
 
-            for (uint256 i = 0; i < buyOrders[_order.commodity].length; i++) {
-                if (!buyOrders[_order.commodity][i].fulfilled) {
-                    if (currentMax < buyOrders[_order.commodity][i].price) {
-                        currentMax = buyOrders[_order.commodity][i].price;
-                        minIndex = i;
-                    }
-                }
-            }
-
-            Order memory buyOrder = buyOrders[_order.commodity][minIndex];
-
-            if (currentMax >= _order.price) {
+            if (buyOrder.price >= _order.price && success) {
                 complete = false;
                 if (buyOrder.amount >= _order.amount) {
                     buyOrder.amount = buyOrder.amount - _order.amount;
@@ -346,13 +325,9 @@ contract AutomatedMarketBook {
                         buyOrder.fulfilled = true;
                     }
 
-                    buyOrders[_order.commodity][minIndex] = buyOrder; // Update order globally at the end (CEI)
+                    buyOrders[_order.commodity][maxIndex] = buyOrder; // Update order globally at the end (CEI)
                 } else {
                     _order.amount = _order.amount - buyOrder.amount;
-
-                    buyOrder.amount = 0;
-
-                    buyOrder.fulfilled = true;
 
                     if (_order.commodity == address(0)) {
                         (bool txStatus,) = (buyOrder.account).call{value: buyOrder.amount}("");
@@ -371,11 +346,15 @@ contract AutomatedMarketBook {
                         require(txStatus, AutomatedMarketBook__TransactionFailed());
                     }
 
-                    buyOrders[_order.commodity][minIndex] = buyOrder;
+                    buyOrder.amount = 0;
+
+                    buyOrder.fulfilled = true;
+
+                    buyOrders[_order.commodity][maxIndex] = buyOrder;
                 }
 
-                if (_order.amount >= 0) {
-                    complete = false;
+                if (_order.amount == 0) {
+                    complete = true;
                 }
             }
         }
@@ -407,5 +386,66 @@ contract AutomatedMarketBook {
 
     function getCommodityStatus(address _commodity) public view returns (bool) {
         return commoditiesAvailable[_commodity];
+    }
+
+    function getMaxBuyOrder(address commodity, address purchasingCommodity)
+        public
+        view
+        returns (Order memory, uint256, bool)
+    {
+        uint256 currentMax = 0;
+        uint256 maxIndex = 0;
+        bool success = false;
+
+        for (uint256 i = 0; i < buyOrders[commodity].length; i++) {
+            if (
+                !buyOrders[commodity][i].fulfilled && buyOrders[commodity][i].purchasingCommodity == purchasingCommodity
+            ) {
+                if (currentMax < buyOrders[commodity][i].price) {
+                    currentMax = buyOrders[commodity][i].price;
+                    maxIndex = i;
+                    success = true;
+                }
+            }
+        }
+
+        Order memory maxBuyOrder = buyOrders[commodity][maxIndex];
+        return (maxBuyOrder, maxIndex, success);
+    }
+
+    function getMinSellOrder(address commodity, address purchasingCommodity)
+        public
+        view
+        returns (Order memory, uint256, bool)
+    {
+        uint256 currentMin = 0;
+        uint256 minIndex = 0;
+        bool success = false;
+
+        for (uint256 i = 0; i < sellOrders[commodity].length; i++) {
+            if (
+                !sellOrders[commodity][i].fulfilled
+                    && sellOrders[commodity][i].purchasingCommodity == purchasingCommodity
+            ) {
+                if (currentMin > sellOrders[commodity][i].price) {
+                    currentMin = sellOrders[commodity][i].price;
+                    minIndex = i;
+                    success = true;
+                }
+            }
+        }
+
+        Order memory minSellOrder = sellOrders[commodity][minIndex];
+        return (minSellOrder, minIndex, success);
+    }
+
+    function getBuyingSpotPrice(address commodity, address purchasingCommodity) public view returns (uint256) {
+        (Order memory order,,) = getMinSellOrder(commodity, purchasingCommodity);
+        return order.price;
+    }
+
+    function getSellingSpotPrice(address commodity, address purchasingCommodity) public view returns (uint256) {
+        (Order memory order,,) = getMaxBuyOrder(commodity, purchasingCommodity);
+        return order.price;
     }
 }
