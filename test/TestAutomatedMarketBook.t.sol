@@ -144,4 +144,66 @@ contract TestAutomatedMarketBook is Test {
         console.log("Contract Token 1 Balance: ", token1.balanceOf(address(automatedMarketBook)));
         console.log("Contract Token 2 Balance: ", token2.balanceOf(address(automatedMarketBook)));
     }
+
+    function test__sellerSpotPricing() public {
+      vm.prank(contractOwner);
+      automatedMarketBook.createNewCommodity(address(token1));
+      
+      vm.startPrank(user2);
+      token2.approve(address(automatedMarketBook), 2 ether);
+      automatedMarketBook.setupBuyOrder(address(token1), 1 ether, 2, address(token2));
+      vm.stopPrank();
+
+      vm.startPrank(user1);
+      token1.approve(address(automatedMarketBook), 1 ether);
+      AutomatedMarketBook.Order memory order = automatedMarketBook.setupSellOrderAtSpot(address(token1), 1 ether, address(token2));
+      vm.stopPrank();
+
+      vm.expectRevert();
+      automatedMarketBook.createNewCommodity(address(token2));
+
+      automatedMarketBook.matchOrder(order);
+
+      console.log("Sell Order Price: ", order.price);
+
+        console.log("User 1 Token 1 Balance: ", token1.balanceOf(user1));
+        console.log("User 1 Token 2 Balance: ", token2.balanceOf(user1));
+
+        console.log("User 2 Token 1 Balance: ", token1.balanceOf(user2));
+        console.log("User 2 Token 2 Balance: ", token2.balanceOf(user2));
+
+        console.log("Contract Token 1 Balance: ", token1.balanceOf(address(automatedMarketBook)));
+        console.log("Contract Token 2 Balance: ", token2.balanceOf(address(automatedMarketBook)));
+    }
+
+    function test__buyerSpotPricing() public {
+      vm.prank(contractOwner);
+      automatedMarketBook.createNewCommodity(address(token1));
+
+      vm.startPrank(user1);
+      token1.approve(address(automatedMarketBook), 1 ether);
+      automatedMarketBook.setupSellOrder(address(token1), 1 ether, 3, address(token2));
+      vm.stopPrank();
+
+      vm.startPrank(user1);
+      token1.approve(address(automatedMarketBook), 1 ether);
+      automatedMarketBook.setupSellOrder(address(token1), 1 ether, 2, address(token2));
+      vm.stopPrank();
+
+      vm.startPrank(user2);
+      token2.approve(address(automatedMarketBook), 6 ether);
+      AutomatedMarketBook.Order memory order = automatedMarketBook.setupBuyOrderAtSpot(address(token1), 2 ether, address(token2));
+      vm.stopPrank();
+
+      automatedMarketBook.matchOrder(order);
+
+        console.log("User 1 Token 1 Balance: ", token1.balanceOf(user1));
+        console.log("User 1 Token 2 Balance: ", token2.balanceOf(user1));
+
+        console.log("User 2 Token 1 Balance: ", token1.balanceOf(user2));
+        console.log("User 2 Token 2 Balance: ", token2.balanceOf(user2));
+
+        console.log("Contract Token 1 Balance: ", token1.balanceOf(address(automatedMarketBook)));
+        console.log("Contract Token 2 Balance: ", token2.balanceOf(address(automatedMarketBook)));
+    }
 }
