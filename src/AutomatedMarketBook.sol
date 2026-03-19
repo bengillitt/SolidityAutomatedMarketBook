@@ -93,17 +93,16 @@ contract AutomatedMarketBook {
         matchBuyOrder(order);
     }
 
-
     function setupBuyOrderAtSpot(address _commodity, uint256 _amount, address _purchasingCommodity)
         public
         payable
         returns (Order memory order)
     {
-      (uint256 price, bool success) = getBuyingSpotPrice(_commodity, _purchasingCommodity);
-      if (success) {
-        order = setupBuyOrder(_commodity, _amount, price, _purchasingCommodity);
-        return order;
-      }
+        (uint256 price, bool success) = getBuyingSpotPrice(_commodity, _purchasingCommodity);
+        if (success) {
+            order = setupBuyOrder(_commodity, _amount, price, _purchasingCommodity);
+            return order;
+        }
     }
 
     function setupSellOrder(address _commodity, uint256 _amount, uint256 _price, address _purchasingCommodity)
@@ -151,11 +150,11 @@ contract AutomatedMarketBook {
         payable
         returns (Order memory order)
     {
-      (uint256 price, bool success) = getSellingSpotPrice(_commodity, _purchasingCommodity);
-      if (success) {
-        order = setupSellOrder(_commodity, _amount, price, _purchasingCommodity);
-        return order;
-      }
+        (uint256 price, bool success) = getSellingSpotPrice(_commodity, _purchasingCommodity);
+        if (success) {
+            order = setupSellOrder(_commodity, _amount, price, _purchasingCommodity);
+            return order;
+        }
     }
 
     function orderMatching(Order memory _order) internal {
@@ -459,12 +458,12 @@ contract AutomatedMarketBook {
     }
 
     function getBuyingSpotPrice(address commodity, address purchasingCommodity) public view returns (uint256, bool) {
-        (Order memory order,,bool success) = getMinSellOrder(commodity, purchasingCommodity);
+        (Order memory order,, bool success) = getMinSellOrder(commodity, purchasingCommodity);
         return (order.price, success);
     }
 
     function getSellingSpotPrice(address commodity, address purchasingCommodity) public view returns (uint256, bool) {
-        (Order memory order,,bool success) = getMaxBuyOrder(commodity, purchasingCommodity);
+        (Order memory order,, bool success) = getMaxBuyOrder(commodity, purchasingCommodity);
         return (order.price, success);
     }
 }
