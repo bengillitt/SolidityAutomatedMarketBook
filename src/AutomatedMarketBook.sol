@@ -418,7 +418,7 @@ contract AutomatedMarketBook {
         view
         returns (Order memory, uint256, bool)
     {
-        uint256 currentMin = 0;
+        uint256 currentMin = type(uint256).max;
         uint256 minIndex = 0;
         bool success = false;
 

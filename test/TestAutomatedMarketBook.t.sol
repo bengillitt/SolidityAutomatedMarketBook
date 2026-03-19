@@ -121,9 +121,18 @@ contract TestAutomatedMarketBook is Test {
         automatedMarketBook.setupSellOrderAndMatch(address(token1), 2 ether, 1, address(token2));
         vm.stopPrank();
 
+        vm.startPrank(user1);
+        token1.approve(address(automatedMarketBook), 2 ether);
+        automatedMarketBook.setupSellOrder(address(token1), 1 ether, 1, address(token2));
+        vm.stopPrank();
+
+        (,,bool success) = automatedMarketBook.getMinSellOrder(address(token1), address(token2));
+
+        console.log("Min sell order success: ", success);
+
         vm.startPrank(user2);
-        token2.approve(address(automatedMarketBook), 2 ether);
-        automatedMarketBook.setupBuyOrderAndMatch(address(token1), 1 ether, 2, address(token2));
+        token2.approve(address(automatedMarketBook), 4 ether);
+        automatedMarketBook.setupBuyOrderAndMatch(address(token1), 2 ether, 2, address(token2));
         vm.stopPrank();
 
         console.log("User 1 Token 1 Balance: ", token1.balanceOf(user1));
